@@ -1,34 +1,123 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8" />
-  <link rel="stylesheet" href="/src/style.css">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fluffy Grass Three.js</title>
-  <meta name="description"
-    content="Fluffiest Grass on the internet. Built using threejs. Grass Material by thebenezer." />
-  <meta name="keywords" content="Three.js, grass material, tutorial, thebenezer, Zero x Infinity" />
-  <meta property="og:title" content="Fluffy Grass Three.js" />
-  <meta property="og:description"
-    content="Fluffiest Grass on the internet. Built using threejs. Grass Material by thebenezer." />
-  <meta property="og:image" content="/social2.webp" />
-  <meta property="og:url" content="https://fluffygrass.vercel.app" />
-  <!-- twitter -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:site" content="@th_ebenezer" />
-  <meta name="twitter:creator" content="@th_ebenezer" />
-  <meta name="twitter:title" content="Fluffy Grass Three.js" />
-  <meta name="twitter:description"
-    content="Fluffiest Grass on the internet. Built using threejs. Grass Material by thebenezer." />
-  <meta name="twitter:image" content="/social2.webp" />
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluffy Grass</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #f1f1f1;
+            font-family: Arial, sans-serif;
+        }
+        #canvas {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #333;
+            font-size: 18px;
+            z-index: 1000;
+        }
+    </style>
 </head>
-
 <body>
-  <canvas id="canvas"></canvas>
-  <!-- <button class="randomizeButton">Randomize</button> -->
-  <script type="module" src="/src/main.ts"></script>
+    <div class="loading">Loading Fluffy Grass...</div>
+    <canvas id="canvas"></canvas>
+    
+    <!-- Load Three.js from unpkg -->
+    <script src="https://unpkg.com/three@0.159.0/build/three.min.js"></script>
+    
+    <script>
+        // Remove loading message
+        document.querySelector('.loading').style.display = 'none';
+        
+        // Simple Three.js scene
+        const canvas = document.getElementById('canvas');
+        const scene = new THREE.Scene();
+        
+        // Camera
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(21.43, 4.51, -7.31);
+        
+        // Renderer
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        // Background color
+        scene.background = new THREE.Color('#eeeeee');
+        
+        // Fog
+        scene.fog = new THREE.FogExp2('#eeeeee', 0.045989);
+        
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
+        directionalLight.castShadow = true;
+        directionalLight.position.set(100, 100, 100);
+        scene.add(directionalLight);
+        
+        // Simple ground plane
+        const groundGeometry = new THREE.PlaneGeometry(100, 100);
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: '#5e875e' });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+        
+        // Create grass blades
+        const grassBlades = [];
+        for (let i = 0; i < 200; i++) {
+            const height = Math.random() * 2 + 0.5;
+            const grassGeometry = new THREE.BoxGeometry(0.05, height, 0.05);
+            const grassMaterial = new THREE.MeshLambertMaterial({ 
+                color: new THREE.Color().setHSL(0.3, 0.8, 0.3 + Math.random() * 0.4) 
+            });
+            const grass = new THREE.Mesh(grassGeometry, grassMaterial);
+            grass.position.x = (Math.random() - 0.5) * 80;
+            grass.position.z = (Math.random() - 0.5) * 80;
+            grass.position.y = height / 2;
+            grass.castShadow = true;
+            grass.userData = { originalY: height / 2, time: Math.random() * Math.PI * 2 };
+            scene.add(grass);
+            grassBlades.push(grass);
+        }
+        
+        // Animation
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const time = Date.now() * 0.001;
+            
+            // Wind animation for grass
+            grassBlades.forEach(grass => {
+                const windStrength = Math.sin(time + grass.userData.time) * 0.1;
+                grass.rotation.z = windStrength;
+                grass.position.y = grass.userData.originalY + Math.sin(time * 2 + grass.userData.time) * 0.1;
+            });
+            
+            renderer.render(scene, camera);
+        }
+        
+        animate();
+        
+        // Handle resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
 </body>
-
 </html>
