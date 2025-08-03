@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import Stats from "stats-gl";
+// import Stats from "stats-gl";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as dat from "dat.gui";
 
@@ -17,14 +17,15 @@ export class FluffyGrass {
 	private renderer: THREE.WebGLRenderer;
 	private scene: THREE.Scene;
 	private canvas: HTMLCanvasElement;
-	private stats: Stats;
+	// private stats: Stats;
 	private orbitControls: OrbitControls;
 	private gui: dat.GUI;
 	private sceneGUI: dat.GUI;
+	private cameraInfo: HTMLDivElement;
 	private sceneProps = {
 		fogColor: "#eeeeee",
 		terrainColor: "#5e875e",
-		fogDensity: 0.02,
+		fogDensity: 0.045989,
 	};
 	private textures: { [key: string]: THREE.Texture } = {};
 
@@ -49,9 +50,9 @@ export class FluffyGrass {
 
 		this.canvas = _canvas;
 		// this.canvas.style.pointerEvents = 'all';
-		this.stats = new Stats({
-			minimal: true,
-		});
+		// this.stats = new Stats({
+		// 	minimal: true,
+		// });
 
 		this.camera = new THREE.PerspectiveCamera(
 			75,
@@ -59,7 +60,7 @@ export class FluffyGrass {
 			0.1,
 			1000
 		);
-		this.camera.position.set(-17, 12, -10);
+		this.camera.position.set(21.43, 4.51, -7.31);
 		this.scene = new THREE.Scene();
 
 		this.scene.background = new THREE.Color(this.sceneProps.fogColor);
@@ -84,9 +85,10 @@ export class FluffyGrass {
 		this.scene.frustumCulled = true;
 
 		this.orbitControls = new OrbitControls(this.camera, canvas);
-		this.orbitControls.autoRotate = true;
+		this.orbitControls.autoRotate = false;
 		this.orbitControls.autoRotateSpeed = -0.5;
 		this.orbitControls.enableDamping = true;
+		this.orbitControls.enabled = false;
 
 		this.grassMaterial = new GrassMaterial();
 		this.terrainMat = new THREE.MeshPhongMaterial({
@@ -98,8 +100,10 @@ export class FluffyGrass {
 
 	private init() {
 		this.setupGUI();
-		this.setupStats();
+		// this.setupStats();
 		this.setupTextures();
+		this.setupCameraInfo();
+		this.createSky();
 		// this.createCube();
 		this.loadModels();
 		this.setupEventListeners();
@@ -113,6 +117,44 @@ export class FluffyGrass {
 		cube.position.set(6, 5, -3);
 		cube.castShadow = true;
 		this.scene.add(cube);
+	}
+
+	private createSky() {
+		// Create a large sphere for the sky
+		const skyGeometry = new THREE.SphereGeometry(500, 32, 32);
+		
+		// Create a gradient material for the sky
+		const skyMaterial = new THREE.ShaderMaterial({
+			vertexShader: `
+				varying vec3 vWorldPosition;
+				void main() {
+					vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+					vWorldPosition = worldPosition.xyz;
+					gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+				}
+			`,
+			fragmentShader: `
+				uniform vec3 topColor;
+				uniform vec3 bottomColor;
+				uniform float offset;
+				uniform float exponent;
+				varying vec3 vWorldPosition;
+				void main() {
+					float h = normalize(vWorldPosition + offset).y;
+					gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 0.5);
+				}
+			`,
+			uniforms: {
+				topColor: { value: new THREE.Color(0x87CEEB) }, // Light blue at top
+				bottomColor: { value: new THREE.Color(0xE0F6FF) }, // Very light blue at bottom
+				offset: { value: 33 },
+				exponent: { value: 0.6 }
+			},
+			side: THREE.BackSide
+		});
+
+		const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+		this.scene.add(sky);
 	}
 
 	private addLights() {
@@ -214,21 +256,6 @@ export class FluffyGrass {
 				this.addGrass(terrainMesh, this.grassGeometry);
 			});
 		});
-
-		const material = new THREE.MeshPhongMaterial({ color: 0x333333 });
-
-		this.gltfLoader.load("/fluffy_grass_text.glb", (gltf) => {
-			gltf.scene.traverse((child) => {
-				if (child instanceof THREE.Mesh) {
-					child.material = material;
-					child.geometry.scale(3, 3, 3);
-					child.position.y += 0.5;
-					child.castShadow = true;
-					child.receiveShadow = true;
-				}
-			});
-			this.scene.add(gltf.scene);
-		});
 	}
 
 	public render() {
@@ -236,7 +263,7 @@ export class FluffyGrass {
 		this.grassMaterial.update(this.Uniforms.uTime.value);
 		this.renderer.render(this.scene, this.camera);
 		// this.postProcessingManager.update();
-		this.stats.update();
+		// this.stats.update();
 		requestAnimationFrame(() => this.render());
 		this.orbitControls.update();
 	}
@@ -263,7 +290,7 @@ export class FluffyGrass {
 		guiContainer.style.top = "0";
 		guiContainer.style.left = "0";
 		guiContainer.style.right = "auto";
-		guiContainer.style.display = "block";
+		guiContainer.style.display = "none";
 
 		this.sceneGUI = this.gui.addFolder("Scene Properties");
 		this.sceneGUI.add(this.orbitControls, "autoRotate").name("Auto Rotate");
@@ -279,25 +306,56 @@ export class FluffyGrass {
 
 		this.grassMaterial.setupGUI(this.sceneGUI);
 
-		this.sceneGUI.open();
+		this.sceneGUI.close();
 	}
 
-	private setupStats() {
-		this.stats.init(this.renderer);
-		this.stats.dom.style.bottom = "45px";
-		this.stats.dom.style.top = "auto";
-		this.stats.dom.style.left = "auto";
-		// this.stats.dom.style.right = "0";
-		this.stats.dom.style.display = "none";
-		document.body.appendChild(this.stats.dom);
+	// private setupStats() {
+	// 	this.stats.init(this.renderer);
+	// 	this.stats.dom.style.bottom = "45px";
+	// 	this.stats.dom.style.top = "auto";
+	// 	this.stats.dom.style.left = "auto";
+	// 	// this.stats.dom.style.right = "0";
+	// 	this.stats.dom.style.display = "none";
+	// 	document.body.appendChild(this.stats.dom);
+	// }
+
+	private setupCameraInfo() {
+		this.cameraInfo = document.createElement('div');
+		this.cameraInfo.style.position = 'fixed';
+		this.cameraInfo.style.top = '20px';
+		this.cameraInfo.style.right = '20px';
+		this.cameraInfo.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+		this.cameraInfo.style.color = 'white';
+		this.cameraInfo.style.padding = '10px';
+		this.cameraInfo.style.borderRadius = '5px';
+		this.cameraInfo.style.fontFamily = 'monospace';
+		this.cameraInfo.style.fontSize = '12px';
+		this.cameraInfo.style.zIndex = '1000';
+		this.cameraInfo.style.pointerEvents = 'none';
+		document.body.appendChild(this.cameraInfo);
+	}
+
+	private updateCameraInfo() {
+		const pos = this.camera.position;
+		const target = this.orbitControls.target;
+		this.cameraInfo.innerHTML = `
+			<div><strong>Camera Position:</strong></div>
+			<div>X: ${pos.x.toFixed(2)}</div>
+			<div>Y: ${pos.y.toFixed(2)}</div>
+			<div>Z: ${pos.z.toFixed(2)}</div>
+			<div><strong>Target:</strong></div>
+			<div>X: ${target.x.toFixed(2)}</div>
+			<div>Y: ${target.y.toFixed(2)}</div>
+			<div>Z: ${target.z.toFixed(2)}</div>
+		`;
 	}
 
 	private setupEventListeners() {
 		window.addEventListener("resize", () => this.setAspectResolution(), false);
 
-		this.stats.dom.addEventListener("click", () => {
-			console.log(this.renderer.info.render);
-		});
+		// this.stats.dom.addEventListener("click", () => {
+		// 	console.log(this.renderer.info.render);
+		// });
 
 		// const randomizeGrassColor = document.querySelector(
 		// 	".randomizeButton"
